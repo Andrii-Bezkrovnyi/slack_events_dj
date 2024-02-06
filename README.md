@@ -1,1 +1,1 @@
-# slack_enents_dj
+# slack_events_dj
