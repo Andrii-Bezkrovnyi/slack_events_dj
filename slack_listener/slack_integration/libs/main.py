@@ -7,7 +7,7 @@ from slackeventsapi import SlackEventAdapter
 from loguru import logger
 from dotenv import load_dotenv
 
-from slack_chat_module import SlackChatPlatform, SlackEventHandler
+from .slack_chat_module import SlackChatPlatform, SlackEventHandler
 
 
 logger.add(sys.stderr, level="INFO")
@@ -30,4 +30,4 @@ if __name__ == "__main__":
     def handle_message(event_data):
         slack_event_handler.handle_message(event_data)
 
-    slack_events_adapter.start(port=3000, debug=True)
+    slack_events_adapter.start(port=8000, debug=True)

@@ -1,7 +1,7 @@
 import requests
 from loguru import logger
 
-from interfaces import ChatPlatform, Conversation, Message
+from .interfaces import ChatPlatform, Conversation, Message
 
 
 logger.add("app.log", level="INFO")
