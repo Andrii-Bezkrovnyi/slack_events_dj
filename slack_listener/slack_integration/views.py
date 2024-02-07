@@ -1,26 +1,19 @@
-from django.http import JsonResponse
 from django.views import View
 import json
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .libs.slack_chat_module import SlackEventHandler, SlackChatPlatform
-
-import os
-import sys
 
 from slack_sdk import WebClient
-from loguru import logger
+from .libs.slack_chat_module import SlackEventHandler, SlackChatPlatform
+
 from dotenv import load_dotenv
 
-logger.add(sys.stderr, level="INFO")
-logger.add(sys.stderr, level="ERROR")
 
 load_dotenv()
 
 # class SlackEventView(View):
-
 #     def post(self, request, *args, **kwargs):
 #         request_data = json.loads(request.body.decode("utf-8"))
 #         SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
