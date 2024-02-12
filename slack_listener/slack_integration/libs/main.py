@@ -19,7 +19,7 @@ load_dotenv()
 
 
 if __name__ == "__main__":
-    # Получите значения переменных окружения из настроек вашего приложения Slack
+    # Get environment variable values from your Slack app settings
     SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
     SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
     target_channel_id = os.getenv("TARGET_CHANNEL_ID")
@@ -31,16 +31,16 @@ if __name__ == "__main__":
     slack_factory.connect({"token": SLACK_BOT_TOKEN})
     app = App(token=SLACK_BOT_TOKEN)
 
-    # Инициализация WebClient
+    # Initializing WebClient
     client = WebClient(token=SLACK_BOT_TOKEN)
 
-    # Инициализация SlackEventAdapter
+    # Initializing SlackEventAdapter
     slack_events_adapter = SlackEventAdapter(SLACK_SIGNING_SECRET, "/slack/events")
 
-    # Instantiate the Bolt app
+    # Initializing Bolt app
     app = App(token=SLACK_BOT_TOKEN)
 
-    # Обработка события "message" (нового сообщения)
+    # Handling the "message" event (new message)
     @slack_events_adapter.on("message")
     def handle_message(event_data):
         message = event_data["event"]
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         if "text" in message:
             logger.info(f"Received a question from a user {message['user']}: {message['text']}")
 
-            # Проверяем, является ли сообщение последним в треде
+            # Checking if the message is the last one in the thread
             if "thread_ts" not in message or message["ts"] == message["thread_ts"]:
                 channel_id = message["channel"]
                 response_text = "Thanks for your question! We`ll review it and respond shortly."
