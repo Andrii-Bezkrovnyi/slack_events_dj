@@ -1,14 +1,10 @@
-import requests
-from loguru import logger
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 from .interfaces import ChatPlatform, Conversation, Message
 
 
-logger.add("app.log", level="INFO")
-
-
-class SlackChatPlatform(ChatPlatform):
-
+class SlackPlatform(ChatPlatform):
     """Implementation of ChatPlatform for Slack.
 
     Attributes:
@@ -22,79 +18,88 @@ class SlackChatPlatform(ChatPlatform):
         connect(self, credentials: dict):
             Connects to Slack using the provided token.
 
-            start_conversation(self, user_id: str):
+        start_conversation(self, user_id: str):
             Starts a new conversation with the user by their id.
     """
-    def __init__(self, credentials: dict):
-        """
-        Initializes a new instance of SlackChatPlatform.
 
-        Args:
-            credentials (dict): A dictionary containing necessary credentials, including 'client' for WebClient.
+    def __init__(self, token: str):
+        """Initializes a new instance of SlackPlatform.
 
+        Parameters:
+            token (str): The Slack API token.
         """
-        self.client = credentials.get("client")
+        self.client = WebClient(token=token)
+        self.channel_id = None
 
     def connect(self, credentials: dict):
+        """Connects to Slack using the provided token.
+
+        Parameters:
+            credentials (dict): A dictionary containing the 'token' for authentication.
         """
-        Connects to the Slack platform using the provided credentials.
+        self.client = WebClient(token=credentials["token"])
 
-        Args:
-            credentials (dict): A dictionary containing necessary credentials for connecting to Slack.
+    def start_conversation(self, user_id: str):
+        """Starts a new conversation with the user by their id.
 
-        """
-        pass
-
-    def start_conversation(self, channel_id: str):
-        """
-        Starts a new conversation in the specified channel.
-
-        Args:
-            channel_id (str): The ID of the channel for starting the conversation.
+        Parameters:
+            user_id (str): The ID of the user for the conversation.
 
         Returns:
-            SlackConversation: An instance of SlackConversation representing the started conversation.
-
+            SlackConversation: An instance of the SlackConversation class for the started conversation.
         """
-        return SlackConversation(channel_id, self.client)
+        self.channel_id = user_id
+        return SlackConversation(self.client, self.channel_id)
 
 
 class SlackConversation(Conversation):
-    """Represents a conversation on Slack."""
-    def __init__(self, channel_id, client):
-        """
-        Initializes a new instance of the SlackConversation class.
+    """Implementation of Conversation for Slack.
 
-        Args:
-            channel_id (str): The ID of the Slack channel for the conversation.
-            client: The Slack client used to interact with the Slack API.
+    Attributes:
+        client (WebClient): The WebClient instance for interacting with the Slack API.
+        channel_id (str): The ID of the Slack channel associated with this conversation.
+    """
+
+    def __init__(self, client: WebClient, channel_id: str):
+        """Initializes a new instance of SlackConversation.
+
+        Parameters:
+            client (WebClient): The WebClient instance for interacting with the Slack API
+            channel_id (str): The ID of the Slack channel associated with this conversation
         """
-        self.channel_id = channel_id
         self.client = client
+        self.channel_id = channel_id
 
-    def send_message(self, message_text: str, thread_ts: str = None):
-        """
-        Sends a message to the Slack channel.
+    def send_message(self, message_text: str):
+        """Sends a message to the user within this conversation.
 
-        Args:
-            message_text (str): The text of the message to be sent.
-            thread_ts (str, optional): The timestamp of the thread to reply to, if any.
+        Parameters:
+            message_text (str): The text of the message to be sent
         """
-        self.client.chat_postMessage(channel=self.channel_id, text=message_text, thread_ts=thread_ts)
+        try:
+            self.client.chat_postMessage(channel=self.channel_id, text=message_text)
+        except SlackApiError as e:
+            print(f"Error sending message: {e.response['error']}")
 
     def receive_messages(self):
+        """Receives and returns a list of new messages from the user in this conversation.
+
+        Returns:
+            list: A list of SlackMessage objects representing received messages
         """
-        Placeholder method for receiving messages from the Slack channel.
-        Actual implementation is missing as it depends on the specific requirements.
-        """
-        pass
+        try:
+            response = self.client.conversations_history(channel=self.channel_id)
+            messages = response["messages"]
+            return [SlackMessage(message) for message in messages]
+        except SlackApiError as e:
+            print(f"Error getting messages: {e.response['error']}")
 
 
 class SlackMessage(Message):
     """Implementation of Message for Slack.
 
     Attributes:
-    - message (dict): The Slack message dictionary.
+        message (dict): The Slack message dictionary.
 
     Methods:
         text(): Returns the text content of the message.
@@ -113,67 +118,3 @@ class SlackMessage(Message):
     def user_id(self):
         """Returns the user ID of the user who sent the message"""
         return self.message.get("user", "")
-
-
-class SlackEventHandler:
-    """
-    A class for handling Slack events and messages.
-
-    Attributes:
-    - slack_chat_platform: The Slack chat platform instance.
-
-    Methods:
-        __init__(self, slack_chat_platform): Initializes the SlackEventHandler with the given Slack chat platform.
-        handle_message(self, event_data): Handles incoming Slack messages and processes them accordingly.
-    """
-    def __init__(self, slack_chat_platform):
-        """
-        Initializes a new instance of the SlackEventHandler class.
-
-        Parameters:
-        - slack_chat_platform (obj): An instance of the Slack chat platform to be used for communication.
-        """
-        self.slack_chat_platform = slack_chat_platform
-
-    def handle_message(self, event_data):
-        """
-        Handles incoming Slack messages and processes them.
-
-        Parameters:
-        - event_data (dict): The data representing the incoming Slack event.
-
-        Details:
-        - Extracts relevant information from the event data such as user ID, channel ID, and message text.
-        - Logs the received question from the user.
-        - Sends a response to the user acknowledging the received question.
-
-        Note:
-        - The actual processing logic for the question, including API requests, is currently commented out.
-
-        Example:
-        ```
-        slack_handler = SlackEventHandler(slack_platform_instance)
-        slack_handler.handle_message(event_data)
-        ```
-
-        """
-        event = event_data["event"]
-        channel_id = event.get("channel", "")
-        user_id = event.get("user", "")
-        text_data = event.get("text", "")
-        # message_text = event["text"]
-        # if "thread_ts" in event:
-        #         thread_ts = event["thread_ts"]
-        # else:
-        #         thread_ts = event["ts"]
-
-        if text_data:
-            logger.info(f"Received a question from a user {user_id}: {text_data}")
-            # Send request to API endpoint
-            # uuid = message_text.strip().replace('UUID ', '')
-            # requests.post('http://localhost:8000/api/v1/create_air_script/', data={'uuid': uuid,
-            #                                                                            'thread_ts': thread_ts})
-
-            if "thread_ts" not in event or event["ts"] == event["thread_ts"]:
-                response_text = "Thanks for your question! We'll review it and respond shortly."
-                self.slack_chat_platform.start_conversation(channel_id).send_message(response_text, thread_ts=event["ts"])

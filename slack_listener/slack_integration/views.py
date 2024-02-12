@@ -1,38 +1,39 @@
-from django.views import View
-import json
+import sys
 import os
+from loguru import logger
+from dotenv import load_dotenv
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from slack_sdk import WebClient
-from .libs.slack_chat_module import SlackEventHandler, SlackChatPlatform
+from .libs.slack_chat_module import SlackPlatform
 
-from dotenv import load_dotenv
 
+logger.add(sys.stderr, level="INFO")
+logger.add(sys.stderr, level="ERROR")
 
 load_dotenv()
 
-# class SlackEventView(View):
-#     def post(self, request, *args, **kwargs):
-#         request_data = json.loads(request.body.decode("utf-8"))
-#         SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
-#         SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
 
-#         credentials = {"client": WebClient(token=SLACK_BOT_TOKEN)}
-#         slack_chat_platform = SlackChatPlatform(credentials)
-#         slack_event_handler = SlackEventHandler(slack_chat_platform)
-#         slack_event_handler.handle_message(request_data)
-#         return HttpResponse(status=200)
+class SlackMessageHandler(APIView):
+    def post(self, request):
+        SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
+        slack_platform = SlackPlatform(SLACK_BOT_TOKEN)
+        slack_platform.connect({"token": SLACK_BOT_TOKEN})
 
+        try:
+            event_data = request.data
+            message = event_data["event"]
+            if "text" in message:
+                logger.info(f"Received a question from a user {message['user']}: {message['text']}")
 
-class SlackEventView(APIView):
-    def post(self, request, *args, **kwargs):
-        SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
-        SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
-        credentials = {"client": WebClient(token=SLACK_BOT_TOKEN)}
-        slack_chat_platform = SlackChatPlatform(credentials)
-        slack_event_handler = SlackEventHandler(slack_chat_platform)
-        slack_event_handler.handle_message(request.data)
-        return Response(status=status.HTTP_200_OK)
+                if "thread_ts" not in message or message["ts"] == message["thread_ts"]:
+                    channel_id = message["channel"]
+                    response_text = "Thanks for your question! We`ll review it and respond shortly."
+                    slack_platform.client.chat_postMessage(channel=channel_id,
+                                                           text=response_text,
+                                                           thread_ts=message["ts"])
+            return Response(status=status.HTTP_200_OK)
+        except Exception:
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
